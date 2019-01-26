@@ -94,7 +94,7 @@ func (s *Datastore) GetAll(opts *FilterOpts) (*Result, error) {
 
 	opts.Where = strings.TrimSpace(opts.Where)
 	if opts.Where != "" {
-		opts.Where = ` WHERE (` + (opts.Where) + `) `
+		opts.Where = (opts.Where) + ` `
 	}
 
 	if opts.Limit < 1 {
@@ -120,6 +120,8 @@ func (s *Datastore) GetAll(opts *FilterOpts) (*Result, error) {
 		result.Hits = append(result.Hits, doc)
 	}
 
+	s.pagerify(opts, result)
+
 	return result, nil
 }
 
@@ -128,6 +130,34 @@ func (s *Datastore) DB() *sqlx.DB {
 	return s.db
 }
 
+// pagerify add the pagination info to the result
+func (s *Datastore) pagerify(o *FilterOpts, r *Result) {
+	if o.Limit < 1 {
+		o.Limit = 10
+	}
+
+	pages := r.Total / uint64(o.Limit)
+	currentpage := (o.Offset / o.Limit) + 1
+	next := currentpage + 1
+	prev := currentpage - 1
+
+	if uint64(next) > pages {
+		next = -1
+	}
+
+	if prev < 1 {
+		prev = -1
+	}
+
+	r.Pager = Pager{
+		Pages:   pages,
+		Next:    next,
+		Prev:    prev,
+		Current: currentpage,
+	}
+}
+
+// boot create the missing tables/indexes
 func (s *Datastore) boot() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS ` + (s.name) + ` (
