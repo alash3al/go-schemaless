@@ -105,7 +105,9 @@ func (s *Datastore) GetAll(opts *FilterOpts) (*Result, error) {
 		return nil, err
 	}
 
-	rows, err := s.db.NamedQuery(`SELECT * FROM `+(s.name)+opts.Where+` LIMIT `+strconv.FormatInt(opts.Limit, 10), opts.Args)
+	sql := `SELECT * FROM ` + (s.name) + opts.Where + ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+
+	rows, err := s.db.NamedQuery(sql, opts.Args)
 	if err != nil {
 		return nil, err
 	}
