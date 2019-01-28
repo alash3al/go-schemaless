@@ -124,11 +124,11 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 	}
 
 	sql := `SELECT * FROM ` + (s.name) + ` ` + opts.Where + sorter + ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+
 	rows, err = s.db.NamedQuery(sql, opts.Args)
 	if err != nil {
 		return nil, err
 	}
-
 	for rows.Next() {
 		var doc Document
 		if err := rows.StructScan(&doc); err != nil {
