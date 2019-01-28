@@ -1,5 +1,14 @@
 package schemaless
 
+// DocumentReservedKeys ...
+var DocumentReservedKeys = map[string]bool{
+	"uuid":       true,
+	"collection": true,
+	"updated_at": true,
+	"created_at": true,
+	"deleted_at": true,
+}
+
 // Document - represents a datastore document
 type Document struct {
 	UUID       string               `json:"uuid" db:"uuid"`

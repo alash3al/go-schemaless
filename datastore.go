@@ -2,6 +2,7 @@ package schemaless
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -101,13 +102,29 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		opts.Limit = 10
 	}
 
-	if err := s.db.Get(&result.Total, `SELECT count(uuid) as totals FROM `+(s.name)+opts.Where); err != nil {
+	rows, err := s.db.NamedQuery(`SELECT count(uuid) as totals FROM `+(s.name)+` `+opts.Where, opts.Args)
+	if err != nil {
 		return nil, err
 	}
 
-	sql := `SELECT * FROM ` + (s.name) + opts.Where + ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+	rows.Next()
+	rows.Scan(&result.Total)
 
-	rows, err := s.db.NamedQuery(sql, opts.Args)
+	sorter := ""
+	if len(opts.Order) > 0 {
+		sorter = " ORDER BY "
+		sorts := []string{}
+		for k, v := range opts.Order {
+			if !DocumentReservedKeys[k] {
+				k = "data->>'" + (k) + "'"
+			}
+			sorts = append(sorts, fmt.Sprintf("%s %s", k, strings.ToUpper(v)))
+		}
+		sorter += strings.Join(sorts, ", ")
+	}
+
+	sql := `SELECT * FROM ` + (s.name) + ` ` + opts.Where + sorter + ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+	rows, err = s.db.NamedQuery(sql, opts.Args)
 	if err != nil {
 		return nil, err
 	}
