@@ -83,10 +83,10 @@ func (s *Datastore) Get(uuid string) (*Document, error) {
 	return &doc, err
 }
 
-// GetAll - fetch all documents using the specified options
-func (s *Datastore) GetAll(opts *FilterOpts) (*Result, error) {
+// Filter - fetch all documents using the specified options
+func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 	result := &Result{}
-	result.Hits = []Document{}
+	result.Hits = []*Document{}
 
 	if opts == nil {
 		opts = &FilterOpts{}
@@ -117,7 +117,7 @@ func (s *Datastore) GetAll(opts *FilterOpts) (*Result, error) {
 		if err := rows.StructScan(&doc); err != nil {
 			return nil, err
 		}
-		result.Hits = append(result.Hits, doc)
+		result.Hits = append(result.Hits, &doc)
 	}
 
 	s.pagerify(opts, result)
@@ -136,7 +136,7 @@ func (s *Datastore) pagerify(o *FilterOpts, r *Result) {
 		o.Limit = 10
 	}
 
-	pages := r.Total / uint64(o.Limit)
+	pages := (r.Total / uint64(o.Limit)) + 1
 	currentpage := (o.Offset / o.Limit) + 1
 	next := currentpage + 1
 	prev := currentpage - 1
@@ -161,7 +161,7 @@ func (s *Datastore) pagerify(o *FilterOpts, r *Result) {
 func (s *Datastore) boot() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS ` + (s.name) + ` (
-			uuid varchar not null,
+			uuid varchar not null primary key,
 			collection varchar DEFAULT 'default',
 			data jsonb DEFAULT null,
 			created_at bigint DEFAULT '0',
@@ -169,12 +169,11 @@ func (s *Datastore) boot() error {
 			deleted_at bigint DEFAULT '0'
 		);
 		
-		CREATE INDEX on ` + (s.name) + ` (collection);
-		CREATE INDEX on ` + (s.name) + ` (uuid);
-		CREATE INDEX on ` + (s.name) + ` (collection, updated_at);
-		CREATE INDEX on ` + (s.name) + ` (collection, created_at);
-		CREATE INDEX on ` + (s.name) + ` (collection, deleted_at);
-		CREATE INDEX on ` + (s.name) + ` using gin(data);
+		CREATE INDEX IF NOT EXISTS ` + (s.name) + `_index_collection on ` + (s.name) + ` (collection);
+		CREATE INDEX IF NOT EXISTS ` + (s.name) + `_index_collection_updated_at on ` + (s.name) + ` (collection, updated_at);
+		CREATE INDEX IF NOT EXISTS ` + (s.name) + `_index_collection_created_at on ` + (s.name) + ` (collection, created_at);
+		CREATE INDEX IF NOT EXISTS ` + (s.name) + `_index_collection_deletd_at on ` + (s.name) + ` (collection, deleted_at);
+		CREATE INDEX IF NOT EXISTS ` + (s.name) + `_index_gin_data on ` + (s.name) + ` using gin(data);
 	`)
 
 	return err
