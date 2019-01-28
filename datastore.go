@@ -166,6 +166,10 @@ func (s *Datastore) pagerify(o *FilterOpts, r *Result) {
 		prev = -1
 	}
 
+	if r.Total < 1 {
+		pages = 0
+	}
+
 	r.Pager = Pager{
 		Pages:   pages,
 		Next:    next,
