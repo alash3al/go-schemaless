@@ -11,10 +11,18 @@ import (
 	"github.com/satori/go.uuid"
 )
 
+// Relation ...
+type Relation struct {
+	Collection string
+	LocalKey   string
+	RemoteKey  string
+}
+
 // Datastore ...
 type Datastore struct {
-	name string
-	db   *sqlx.DB
+	name      string
+	db        *sqlx.DB
+	relations map[string]*Relation
 }
 
 // NewDatastore ...
@@ -61,10 +69,10 @@ func (s *Datastore) Create(doc *Document) error {
 }
 
 // Update a document using its uuid, also you can merge/override its content
-func (s *Datastore) Update(uuid string, data SQLObject, override bool) (*Document, error) {
+func (s *Datastore) Update(uuid string, data SQLObject, replace bool) (*Document, error) {
 	now := time.Now().UnixNano()
 	dataSQL := `data || $1`
-	if override {
+	if replace {
 		dataSQL = `$1`
 	}
 
@@ -134,6 +142,12 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		if err := rows.StructScan(&doc); err != nil {
 			return nil, err
 		}
+		doc.Relations = map[string][]*Document{}
+		for relname, rel := range s.relations {
+			if rel.Collection == doc.Collection {
+				doc.Relations[relname] = s.loadDocRelation(&doc, rel)
+			}
+		}
 		result.Hits = append(result.Hits, &doc)
 	}
 
@@ -145,6 +159,28 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 // DB - returns the underlying sqlx.db
 func (s *Datastore) DB() *sqlx.DB {
 	return s.db
+}
+
+// Name - returns the datastore name
+func (s *Datastore) Name() string {
+	return s.name
+}
+
+// loadDocRelation - load the document relations
+func (s *Datastore) loadDocRelation(doc *Document, rel *Relation) []*Document {
+	var ret = []*Document{}
+	var lft = ""
+	var rght = doc.Data[rel.LocalKey]
+
+	if DocumentReservedKeys[rel.RemoteKey] {
+		lft = rel.RemoteKey
+	} else {
+		lft = "data->>'" + (rel.RemoteKey) + "'"
+	}
+
+	s.db.Select(&ret, `SELECT * FROM `+s.name+` WHERE collection = $1 AND `+lft+` = $2`, doc.Collection, rght)
+
+	return ret
 }
 
 // pagerify add the pagination info to the result
