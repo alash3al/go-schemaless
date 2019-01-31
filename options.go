@@ -2,11 +2,12 @@ package schemaless
 
 // FilterOpts ...
 type FilterOpts struct {
-	Where  string
-	Order  map[string]string
-	Args   map[string]interface{}
-	Offset int64
-	Limit  int64
+	Where    string
+	Order    map[string]string
+	Args     map[string]interface{}
+	Paginate bool
+	Offset   int64
+	Limit    int64
 }
 
 // OffsetFromPage set the offset from the specified page number

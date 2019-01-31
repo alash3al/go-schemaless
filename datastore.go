@@ -131,7 +131,11 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		sorter += strings.Join(sorts, ", ")
 	}
 
-	sql := `SELECT * FROM ` + (s.name) + ` ` + opts.Where + sorter + ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+	sql := `SELECT * FROM ` + (s.name) + ` ` + opts.Where + sorter
+
+	if opts.Paginate {
+		sql += ` OFFSET ` + strconv.FormatInt(opts.Offset, 10) + ` LIMIT ` + strconv.FormatInt(opts.Limit, 10)
+	}
 
 	rows, err = s.db.NamedQuery(sql, opts.Args)
 	if err != nil {
@@ -151,7 +155,9 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		result.Hits = append(result.Hits, &doc)
 	}
 
-	s.pagerify(opts, result)
+	if opts.Paginate {
+		s.pagerify(opts, result)
+	}
 
 	return result, nil
 }
