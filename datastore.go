@@ -141,6 +141,7 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for rows.Next() {
 		var doc Document
 		if err := rows.StructScan(&doc); err != nil {
