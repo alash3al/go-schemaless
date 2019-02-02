@@ -13,6 +13,7 @@ import (
 
 // Relation ...
 type Relation struct {
+	On         string
 	Collection string
 	LocalKey   string
 	RemoteKey  string
@@ -22,7 +23,7 @@ type Relation struct {
 type Datastore struct {
 	name      string
 	db        *sqlx.DB
-	relations map[string]*Relation
+	relations map[string]Relation
 }
 
 // NewDatastore ...
@@ -36,12 +37,18 @@ func NewDatastore(name string, conn *sql.DB) (*Datastore, error) {
 	s := new(Datastore)
 	s.name = name
 	s.db = db
+	s.relations = map[string]Relation{}
 
 	if err := s.boot(); err != nil {
 		return nil, err
 	}
 
 	return s, nil
+}
+
+// AddRelation ...
+func (s *Datastore) AddRelation(key string, rel Relation) {
+	s.relations[key] = rel
 }
 
 // Create - insert a new document
@@ -60,9 +67,16 @@ func (s *Datastore) Create(doc *Document) error {
 	doc.UUID = id.String()
 	doc.CreatedAt = now
 	doc.UpdatedAt = now
+	doc.Relations = map[string][]*Document{}
 
 	if _, err := s.db.Exec(sql, id, doc.Collection, doc.Data, doc.CreatedAt, doc.UpdatedAt, 0); err != nil {
 		return err
+	}
+
+	for relname, rel := range s.relations {
+		if rel.On == doc.Collection {
+			doc.Relations[relname] = s.loadDocRelation(doc, rel)
+		}
 	}
 
 	return nil
@@ -88,6 +102,18 @@ func (s *Datastore) Get(uuid string) (*Document, error) {
 	var doc Document
 
 	err := s.db.QueryRowx(`SELECT * FROM `+(s.name)+` WHERE uuid = $1`, uuid).StructScan(&doc)
+
+	if err != nil {
+		return nil, err
+	}
+
+	doc.Relations = map[string][]*Document{}
+
+	for relname, rel := range s.relations {
+		if rel.On == doc.Collection {
+			doc.Relations[relname] = s.loadDocRelation(&doc, rel)
+		}
+	}
 
 	return &doc, err
 }
@@ -149,7 +175,7 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		}
 		doc.Relations = map[string][]*Document{}
 		for relname, rel := range s.relations {
-			if rel.Collection == doc.Collection {
+			if rel.On == doc.Collection {
 				doc.Relations[relname] = s.loadDocRelation(&doc, rel)
 			}
 		}
@@ -174,18 +200,21 @@ func (s *Datastore) Name() string {
 }
 
 // loadDocRelation - load the document relations
-func (s *Datastore) loadDocRelation(doc *Document, rel *Relation) []*Document {
+func (s *Datastore) loadDocRelation(doc *Document, rel Relation) []*Document {
 	var ret = []*Document{}
-	var lft = ""
+	var lft = rel.RemoteKey
 	var rght = doc.Data[rel.LocalKey]
 
-	if DocumentReservedKeys[rel.RemoteKey] {
-		lft = rel.RemoteKey
-	} else {
-		lft = "data->>'" + (rel.RemoteKey) + "'"
-	}
+	s.db.Select(&ret, `SELECT * FROM `+s.name+` WHERE collection = $1 AND `+lft+` = $2`, rel.Collection, rght)
 
-	s.db.Select(&ret, `SELECT * FROM `+s.name+` WHERE collection = $1 AND `+lft+` = $2`, doc.Collection, rght)
+	for _, doc := range ret {
+		doc.Relations = map[string][]*Document{}
+		for relname, rel := range s.relations {
+			if rel.On == doc.Collection {
+				doc.Relations[relname] = s.loadDocRelation(doc, rel)
+			}
+		}
+	}
 
 	return ret
 }
