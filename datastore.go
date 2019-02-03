@@ -21,9 +21,8 @@ type Relation struct {
 
 // Datastore ...
 type Datastore struct {
-	name      string
-	db        *sqlx.DB
-	relations map[string]Relation
+	name string
+	db   *sqlx.DB
 }
 
 // NewDatastore ...
@@ -37,18 +36,12 @@ func NewDatastore(name string, conn *sql.DB) (*Datastore, error) {
 	s := new(Datastore)
 	s.name = name
 	s.db = db
-	s.relations = map[string]Relation{}
 
 	if err := s.boot(); err != nil {
 		return nil, err
 	}
 
 	return s, nil
-}
-
-// AddRelation ...
-func (s *Datastore) AddRelation(key string, rel Relation) {
-	s.relations[key] = rel
 }
 
 // Create - insert a new document
@@ -67,16 +60,9 @@ func (s *Datastore) Create(doc *Document) error {
 	doc.UUID = id.String()
 	doc.CreatedAt = now
 	doc.UpdatedAt = now
-	doc.Relations = map[string][]*Document{}
 
 	if _, err := s.db.Exec(sql, id, doc.Collection, doc.Data, doc.CreatedAt, doc.UpdatedAt, 0); err != nil {
 		return err
-	}
-
-	for relname, rel := range s.relations {
-		if rel.On == doc.Collection {
-			doc.Relations[relname] = s.loadDocRelation(doc, rel)
-		}
 	}
 
 	return nil
@@ -105,14 +91,6 @@ func (s *Datastore) Get(uuid string) (*Document, error) {
 
 	if err != nil {
 		return nil, err
-	}
-
-	doc.Relations = map[string][]*Document{}
-
-	for relname, rel := range s.relations {
-		if rel.On == doc.Collection {
-			doc.Relations[relname] = s.loadDocRelation(&doc, rel)
-		}
 	}
 
 	return &doc, err
@@ -174,12 +152,6 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 		if err := rows.StructScan(&doc); err != nil {
 			return nil, err
 		}
-		doc.Relations = map[string][]*Document{}
-		for relname, rel := range s.relations {
-			if rel.On == doc.Collection {
-				doc.Relations[relname] = s.loadDocRelation(&doc, rel)
-			}
-		}
 		result.Hits = append(result.Hits, &doc)
 	}
 
@@ -198,26 +170,6 @@ func (s *Datastore) DB() *sqlx.DB {
 // Name - returns the datastore name
 func (s *Datastore) Name() string {
 	return s.name
-}
-
-// loadDocRelation - load the document relations
-func (s *Datastore) loadDocRelation(doc *Document, rel Relation) []*Document {
-	var ret = []*Document{}
-	var lft = rel.RemoteKey
-	var rght = doc.Data[rel.LocalKey]
-
-	s.db.Select(&ret, `SELECT * FROM `+s.name+` WHERE collection = $1 AND `+lft+` = $2`, rel.Collection, rght)
-
-	for _, doc := range ret {
-		doc.Relations = map[string][]*Document{}
-		for relname, rel := range s.relations {
-			if rel.On == doc.Collection {
-				doc.Relations[relname] = s.loadDocRelation(doc, rel)
-			}
-		}
-	}
-
-	return ret
 }
 
 // pagerify add the pagination info to the result
