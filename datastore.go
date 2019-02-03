@@ -140,6 +140,7 @@ func (s *Datastore) Filter(opts *FilterOpts) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	rows.Next()
 	rows.Scan(&result.Total)
