@@ -76,7 +76,7 @@ func (s *Datastore) Update(uuid string, data SQLObject, replace bool) (*Document
 		dataSQL = `$1`
 	}
 
-	if _, err := s.db.Exec(`UPDATE `+(s.name)+` SET data = `+(dataSQL)+`, updated_at = $2 WHERE uuid = $3`, data.String(), now, uuid); err != nil {
+	if _, err := s.db.Exec(`UPDATE `+(s.name)+` SET data = `+(dataSQL)+`, updated_at = $2 WHERE uuid = $3`, data.JSON(), now, uuid); err != nil {
 		return nil, err
 	}
 

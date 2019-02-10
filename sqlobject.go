@@ -8,8 +8,8 @@ import (
 // SQLObject - implements a driver custom type for postgress
 type SQLObject map[string]interface{}
 
-// String - return the json string of the object
-func (o SQLObject) String() string {
+// JSON - return the json string of the object
+func (o SQLObject) JSON() string {
 	j, _ := json.Marshal(o)
 
 	return string(j)
